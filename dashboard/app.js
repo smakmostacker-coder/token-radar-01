@@ -1,21 +1,23 @@
 // Launch Radar page: four views — All protocols (every protocol in the
 // snapshot: the ranked board first, then the already-traded and the
 // screened-out, each tagged with its status), Top protocols (the biggest
-// by TVL), Early protocols (tracked under six months) and the Watchlist
-// (the house list plus protocols carrying a sourced airdrop signal) —
-// plus a detail view per protocol and a method page. Only All carries the
-// board's rank numbers; Top, Early and Watchlist number their rows in the
-// order shown. No network: every figure comes from ../data.js, written by
-// the entry program. Socials and links are shown as text, never as live
-// links.
+// by TVL), Early protocols (the youngest: tracked three months at most,
+// youngest first) and the Watchlist (the sourced signal set: confirmed
+// airdrops, tagged CONFIRMED, plus points/XP programmes that could
+// convert) — plus a detail view per protocol and a method page. Only All
+// carries the board's rank numbers; Top, Early and Watchlist number their
+// rows in the order shown. No network: every figure comes from ../data.js,
+// written by the entry program. Socials and links are shown as text, never
+// as live links.
 
 'use strict';
 
 const R = window.RADAR;
 const W = R.weights;
 const view = document.getElementById('view');
-const TOP_N = 25;
-const EARLY_DAYS = 180;
+const TOP_MIN_TVL = 10_000_000;
+const TOP_MIN_VOLUME = 10_000_000;
+const EARLY_DAYS = 90;
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -122,23 +124,25 @@ const SEGMENTS = {
   },
   top: {
     title: 'Top protocols',
-    blurb: `The ${TOP_N} biggest ranked protocols by TVL — the most established names still without a token. Numbered here by TVL, largest first; each protocol's board rank is on its detail page.`,
-    rows: () => [...R.rows].sort((a, b) => b.tvl_usd - a.tvl_usd).slice(0, TOP_N),
+    blurb: `Every ranked protocol with a TVL of ${money(TOP_MIN_TVL)} or more, or a 30-day trading volume of ${money(TOP_MIN_VOLUME)} or more — the most established names still without a token, including the ones that run on volume rather than locked value. Ordered by the larger of the two figures, which is the bold one on each row; each protocol's board rank is on its detail page.`,
+    rows: () => R.rows.filter((r) => r.tvl_usd >= TOP_MIN_TVL || (r.volume_30d_usd ?? 0) >= TOP_MIN_VOLUME),
   },
   early: {
     title: 'Early protocols',
-    blurb: `Protocols DefiLlama has tracked for ${EARLY_DAYS} days or fewer — newly launched or newly listed, small but live, and still without a token.`,
+    blurb: `The youngest on the board: protocols DefiLlama has tracked for ${EARLY_DAYS} days or fewer — three months at most — ordered youngest first. Newly launched or newly listed, small but live, and still without a token.`,
     rows: () => R.rows.filter((r) => r.age_days !== null && r.age_days <= EARLY_DAYS),
   },
   watchlist: {
     title: 'Watchlist',
-    blurb: 'Confirmed airdrops only: a protocol belongs here when its team has publicly committed to a token and an airdrop — an explicit public statement by the team or its leadership, or an official points-to-token conversion commitment. Points programmes, roadmap mentions, rumours and likely-someday hints do not qualify. Every row states its confirmation and its source.',
-    rows: () => R.rows.filter((r) => r.signal?.confirmed),
+    blurb: 'The sourced signal set, in two kinds. A CONFIRMED airdrop: the team has publicly committed to a token and an airdrop — an explicit public statement by the team or its leadership, or an official points-to-token conversion commitment. Or a points/XP programme that could convert into one — a potential, not confirmed. Every row states its basis and its source.',
+    rows: () => R.rows.filter((r) => r.signal),
   },
 };
 
 function whyLine(r) {
-  if (r.signal) return `<b>Confirmed:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span>`;
+  if (r.signal?.confirmed) return `<b>Confirmed:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span>`;
+  if (r.signal?.points) return `<b>Points programme — potential, not confirmed:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span>`;
+  if (r.signal) return `<b>Signal:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span>`;
   return `<b>House list:</b> records no token at or above the ${money(R.floor_usd)} TVL floor in the snapshot's DefiLlama record.`;
 }
 
@@ -148,6 +152,8 @@ const SORTS = {
   rank: (a, b) => (a.seq ?? a.rank) - (b.seq ?? b.rank),
   name: (a, b) => a.name.localeCompare(b.name),
   tvl: (a, b) => b.tvl_usd - a.tvl_usd,
+  volume: (a, b) => (b.volume_30d_usd ?? -1) - (a.volume_30d_usd ?? -1),
+  size: (a, b) => Math.max(b.tvl_usd, b.volume_30d_usd ?? 0) - Math.max(a.tvl_usd, a.volume_30d_usd ?? 0),
   change: (a, b) => (b.change_7d ?? -1e9) - (a.change_7d ?? -1e9),
   implied: (a, b) => (b.implied_value_usd ?? -1) - (a.implied_value_usd ?? -1),
   raised: (a, b) => (b.raised_usd ?? -1) - (a.raised_usd ?? -1),
@@ -163,7 +169,7 @@ function filteredRows(state) {
     const q = state.q.toLowerCase();
     rows = rows.filter((r) => r.name.toLowerCase().includes(q) || r.slug.includes(q) || (r.twitter ?? '').toLowerCase().includes(q));
   }
-  const key = state.sort || (state.segment === 'top' ? 'tvl' : 'rank');
+  const key = state.sort || (state.segment === 'top' ? 'size' : state.segment === 'early' ? 'age' : 'rank');
   const sorted = [...rows].sort(SORTS[key] ?? SORTS.rank);
   if (state.dir === 'rev') sorted.reverse();
   return sorted;
@@ -176,20 +182,23 @@ function filteredRows(state) {
  * lives on the detail page). Tags appear in the Watchlist view alone.
  */
 function rowHTML(r, state, idx) {
-  const tags = state.segment === 'watchlist' ? '<span class="tag wl">WATCHLIST</span>' : '';
+  const tags = state.segment === 'watchlist' ? '<span class="tag wl">WATCHLIST</span>' + (r.signal?.confirmed ? '<span class="tag conf">CONFIRMED</span>' : '') : '';
+  const tvlCell = state.segment === 'top' && r.tvl_usd >= (r.volume_30d_usd ?? 0) ? `<b>${money(r.tvl_usd)}</b>` : money(r.tvl_usd);
+  const volCell = state.segment === 'top' && (r.volume_30d_usd ?? 0) > r.tvl_usd ? `<b>${money(r.volume_30d_usd)}</b>` : money(r.volume_30d_usd);
   const main = `<tr data-slug="${esc(r.slug)}">
     <td class="rank">${idx + 1}</td>
     <td><span class="pname">${esc(r.name)}</span>${tags}${socialsHTML(r)}</td>
     <td class="sector">${esc(r.sector_label)}</td>
     <td class="chains">${esc(r.chains.slice(0, 2).join(', '))}${r.chains.length > 2 ? ` +${r.chains.length - 2}` : ''}</td>
-    <td class="num">${money(r.tvl_usd)}</td>
+    <td class="num">${tvlCell}</td>
+    <td class="num">${volCell}</td>
     <td class="num">${pctCell(r.change_7d)}</td>
     <td class="num"><b>${money(r.implied_value_usd)}</b></td>
     <td class="num">${money(r.raised_usd)}</td>
     <td class="num">${ageText(r.age_days)}</td>
   </tr>`;
   if (state.segment !== 'watchlist') return main;
-  return main + `<tr><td></td><td colspan="8" class="sigline">${whyLine(r)}</td></tr>`;
+  return main + `<tr><td></td><td colspan="9" class="sigline">${whyLine(r)}</td></tr>`;
 }
 
 /**
@@ -205,6 +214,7 @@ function allRowHTML(c) {
     <td class="sector">${esc(c.sector_label)}</td>
     <td class="chains">${esc(c.chains.slice(0, 2).join(', '))}${c.chains.length > 2 ? ` +${c.chains.length - 2}` : ''}</td>
     <td class="num">${money(c.tvl_usd)}</td>
+    <td class="num">${money(c.volume_30d_usd)}</td>
     <td class="num">${pctCell(c.change_7d)}</td>
     <td class="num">${c.implied_value_usd === null ? '—' : `<b>${money(c.implied_value_usd)}</b>`}</td>
     <td class="num">${money(c.raised_usd)}</td>
@@ -242,6 +252,7 @@ function renderBoard(state) {
         <th>Sector</th>
         <th>Chains</th>
         <th class="num sortable" data-sort="tvl">TVL</th>
+        <th class="num sortable" data-sort="volume">Volume 30d</th>
         <th class="num sortable" data-sort="change">7d</th>
         <th class="num sortable" data-sort="implied">Implied value</th>
         <th class="num sortable" data-sort="raised">Raised</th>
@@ -256,7 +267,7 @@ function renderBoard(state) {
     const rows = filteredRows(state);
     document.getElementById('tbody').innerHTML = rows.length
       ? rows.map((r, i) => (state.segment === 'all' ? allRowHTML(r) : rowHTML(r, state, i))).join('')
-      : '<tr><td colspan="9" class="empty">No protocol matches these filters.</td></tr>';
+      : '<tr><td colspan="10" class="empty">No protocol matches these filters.</td></tr>';
     document.getElementById('count-note').textContent = `${rows.length} of ${segRows.length} shown`;
     view.querySelectorAll('#tbody tr[data-slug]').forEach((tr) =>
       tr.addEventListener('click', () => {
@@ -337,7 +348,7 @@ function renderDetail(slug) {
   view.innerHTML = `
   ${back}
   <div class="detail-head">
-    <h2>${esc(r.name)}${r.signal?.confirmed ? '<span class="tag wl">WATCHLIST</span>' : ''}</h2>
+    <h2>${esc(r.name)}${r.signal ? '<span class="tag wl">WATCHLIST</span>' : ''}${r.signal?.confirmed ? '<span class="tag conf">CONFIRMED</span>' : ''}</h2>
     <p class="detail-meta">${esc(r.sector_label)} · ${esc(r.chains.join(', ') || 'no chains recorded')} · records no token${r.twitter ? ` · <span class="x">X @${esc(r.twitter)}</span>` : ''}${r.website ? ` · ${esc(siteText(r.website))}` : ''}</p>
   </div>
   <section class="stats dgrid">
@@ -368,8 +379,9 @@ function renderDetail(slug) {
         ${raisedBox}
       </section>
       ${r.signal?.confirmed ? `<section class="box sigbox"><h3>On the watchlist — confirmed airdrop</h3><p>${whyLine(r)}</p></section>` : ''}
-      ${r.signal && !r.signal.confirmed ? `<section class="box"><h3>Airdrop signal — not confirmed</h3><p><b>Signal:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span></p><p>A signal is not a public commitment to a token and an airdrop, so this protocol is not on the Watchlist tab, which holds confirmed airdrops only.</p></section>` : ''}
-      ${!r.signal && r.on_watchlist ? `<section class="box"><h3>On the house list</h3><p>The bounty's own watchlist: it records no token at or above the ${money(R.floor_usd)} TVL floor in the snapshot's DefiLlama record, and the gate requires it ranked on this board. House-list membership is a coverage rule, not an airdrop confirmation — the Watchlist tab holds only protocols whose team has publicly committed to a token and an airdrop, and no such commitment is on record for this one.</p></section>` : ''}
+      ${r.signal && !r.signal.confirmed && r.signal.points ? `<section class="box"><h3>Points programme — a potential, unconfirmed airdrop</h3><p><b>Points:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span></p><p>This protocol runs a points/XP programme that could potentially become an airdrop. That is a potential, not a confirmation: the team has not publicly committed to a token and an airdrop, so on the Watchlist tab this row reads as potential — only a public commitment earns the CONFIRMED tag.</p></section>` : ''}
+      ${r.signal && !r.signal.confirmed && !r.signal.points ? `<section class="box"><h3>Airdrop signal — not confirmed</h3><p><b>Signal:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span></p><p>A signal is not a public commitment to a token and an airdrop; on the Watchlist tab it reads as a sourced signal, short of the CONFIRMED tag.</p></section>` : ''}
+      ${!r.signal && r.on_watchlist ? `<section class="box"><h3>On the house list</h3><p>The bounty's own watchlist: it records no token at or above the ${money(R.floor_usd)} TVL floor in the snapshot's DefiLlama record, and the gate requires it ranked on this board. House-list membership is a coverage rule, not an airdrop confirmation — the Watchlist tab holds the sourced signal set (confirmed airdrops and points/XP programmes that could convert), and no sourced signal is on record for this one.</p></section>` : ''}
     </div>
     <section class="box">
       <h3>Farm plan — six steps</h3>
@@ -391,8 +403,8 @@ function renderMethod() {
     <h3>The screen</h3>
     <p>A protocol ranks only if it records no token and is an independent protocol: not a bridge, canonical bridge or cross-chain bridge; not a liquid staking, liquid restaking, restaked-BTC, anchored-BTC, decentralised-BTC or stablecoin-wrapper product of a token that already trades; not an exchange (CEX) or a product carrying an exchange's name; not a chain itself; and not a versioned pool of another protocol. The house watchlist is exempt from the product screen — the bounty requires its coverage, and it is the floor, never the ceiling.</p>
     <h3>The four views</h3>
-    <p><b>All protocols</b> lists every protocol in the snapshot (${R.counts.scanned}): the ranked board first, in rank order, then the ${R.counts.traded} already traded and the ${R.counts.screened} the screen leaves unranked, each tagged with its status and, for the unranked, the screen's reason. Only All carries the board's rank numbers. <b>Top protocols</b> is the board's ${TOP_N} largest by TVL (the snapshot carries no trading-volume field, so size is TVL and the activity gauge shown is the 7-day TVL change), numbered by TVL. <b>Early protocols</b> is tracked for ${EARLY_DAYS} days or fewer. Top, Early and Watchlist number their rows in the order shown.</p>
-    <p><b>Watchlist</b> is confirmed airdrops only. A protocol joins it when its team has publicly committed to a token and an airdrop — an explicit public statement by the team or its leadership, or an official points-to-token conversion commitment — with the statement's source named on its row. On this snapshot ${confirmedCount} protocol qualifies: ${confirmedRows.map((r) => esc(r.name)).join(', ')}. A points programme, a roadmap mention, a rumour or a likely-someday hint is a signal, not a confirmation: marginfi (points carried into its Project 0 relaunch; a token named in a later roadmap), Loopscale (points live; a conversion reported by a third-party tracker, not committed by the team) and Hyperbeat (a points programme and a ticker purchase) carry sourced signals, recorded on their detail pages, and stay off this tab. The house list (${kitCount} protocols) is the bounty's own list, not this tab: the gate requires every house-list protocol ranked on the board, and all ${kitCount} are — but house-list membership follows the house's coverage rule (no token recorded, at or above the floor), and is not an airdrop confirmation, so it does not put a protocol on the Watchlist tab. The genre's textbook signal, Sol Incinerator's airdrop-teasing post, would still not qualify its protocol here — a tease is not a commitment — and Sol Incinerator is not in the snapshot anyway (it sits below the snapshot's TVL floor).</p>
+    <p><b>All protocols</b> lists every protocol in the snapshot (${R.counts.scanned}): the ranked board first, in rank order, then the ${R.counts.traded} already traded and the ${R.counts.screened} the screen leaves unranked, each tagged with its status and, for the unranked, the screen's reason. Only All carries the board's rank numbers. <b>Top protocols</b> is every ranked protocol that clears either size lane: a TVL of at least ${money(TOP_MIN_TVL)}, or a trailing-30-day trading volume of at least ${money(TOP_MIN_VOLUME)}. The snapshot carries no volume field, so volume is an enrichment from DefiLlama's public volume datasets (below); a protocol with no figure there can still qualify on TVL alone. Rows are ordered by the larger of the two figures — TVL or 30-day volume, whichever is bigger is the row's size, and it is the bold figure on the row — so a protocol that runs on volume rather than locked value (a prediction market, say) is not buried under the TVL-heavy names. The 7-day TVL change remains the activity column. <b>Early protocols</b> is the youngest on the board: tracked for ${EARLY_DAYS} days or fewer — three months at most — and ordered youngest first. Top, Early and Watchlist number their rows in the order shown.</p>
+    <p><b>Watchlist</b> holds confirmed airdrops (tagged CONFIRMED) plus sourced points/XP programmes that could convert. A protocol is confirmed when its team has publicly committed to a token and an airdrop — an explicit public statement by the team or its leadership, or an official points-to-token conversion commitment — with the statement's source named on its row. On this snapshot ${confirmedCount} protocol qualifies: ${confirmedRows.map((r) => esc(r.name)).join(', ')}. Beside it sit the points/XP programmes: marginfi (points carried into its Project 0 relaunch; a token named in a later roadmap), Loopscale (points live; a conversion reported by a third-party tracker, not committed by the team) and Hyperbeat (a points programme and a ticker purchase) run points that could potentially become an airdrop — a potential, not a confirmation, and their rows and detail pages say so, under a “Points programme — a potential, unconfirmed airdrop” note that names its source. A roadmap mention, a rumour or a likely-someday hint with no programme behind it earns neither tag. The house list (${kitCount} protocols) is the bounty's own list, not this tab: the gate requires every house-list protocol ranked on the board, and all ${kitCount} are — but house-list membership follows the house's coverage rule (no token recorded, at or above the floor), carries no sourced signal, and so does not by itself put a protocol on the Watchlist tab. The genre's textbook signal, Sol Incinerator's airdrop-teasing post, is a tease with no programme or commitment behind it — and Sol Incinerator is not in the snapshot anyway (it sits below the snapshot's TVL floor).</p>
     <h3>Field provenance</h3>
     <table>
       <tr><th>Field</th><th>Source</th></tr>
@@ -400,6 +412,7 @@ function renderMethod() {
       <tr><td>Sector</td><td>Mapped from the snapshot's DefiLlama category by the stated table in the entry's model file (Lending → DeFi · Lending, Dexs → DeFi · DEX, Derivatives → DeFi · Perps, and so on).</td></tr>
       <tr><td>X handle, website</td><td>DefiLlama's live protocol records (its twitter and url fields), fetched 2026-11-23 and baked into the repository as data, because the program runs with no network. Shown as text. A protocol with no record shows none; none is guessed.</td></tr>
       <tr><td>Money raised</td><td>DefiLlama's raises records, read per protocol on 2026-11-23 and totalled in the repository's data. A dash means no round is on that record — never an estimate.</td></tr>
+      <tr><td>Trading volume, 30 days</td><td>DefiLlama's public volume datasets (its dexs and options overviews), fetched 2026-11-23 and baked into the repository's data, joined on DefiLlama's own protocol slugs. Its derivatives overview is paywalled, so perpetuals protocols show no figure rather than an estimate; a dash means no volume on that public record.</td></tr>
       <tr><td>Signals</td><td>Checked by hand on 2026-11-23 against the source named on each row (the protocol's own docs, its team's public statements, and reporting of them).</td></tr>
       <tr><td>Implied value, farm plan</td><td>The entry's own work, derived from the fields above by the stated model; the plan's ticket, gas and holding window come from the protocol's own TVL, first chain and age.</td></tr>
     </table>

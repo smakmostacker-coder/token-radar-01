@@ -1,0 +1,465 @@
+{
+ "meta": {
+  "note": "Per-protocol trading volume, trailing 30 days, from DefiLlama's public volume datasets (api.llama.fi/overview/dexs and /overview/options), joined to the snapshot on DefiLlama's own protocol slugs. The derivatives overview is paywalled (HTTP 402 on every public route checked), so perpetuals protocols carry no figure here rather than an estimate; a slug with no entry has no volume on DefiLlama's public record \u2014 never an estimate. Where a protocol appears in both datasets the larger figure is kept, with its dataset named.",
+  "source": "DefiLlama public volume datasets: https://api.llama.fi/overview/dexs and https://api.llama.fi/overview/options",
+  "fetched_at": "2026-11-23"
+ },
+ "by_slug": {
+  "aero-basic": [
+   107392107,
+   "dexs"
+  ],
+  "aero-slipstream": [
+   20642447972,
+   "dexs"
+  ],
+  "aerodrome-slipstream": [
+   3798213627,
+   "dexs"
+  ],
+  "aerodrome-v1": [
+   98016628,
+   "dexs"
+  ],
+  "agni-finance": [
+   26871251,
+   "dexs"
+  ],
+  "apeswap-amm": [
+   1665585,
+   "dexs"
+  ],
+  "aquarius-stellar": [
+   50158694,
+   "dexs"
+  ],
+  "balancer-v2": [
+   19083663,
+   "dexs"
+  ],
+  "balancer-v3": [
+   23260100,
+   "dexs"
+  ],
+  "bancor-v2.1": [
+   4581390,
+   "dexs"
+  ],
+  "bancor-v3": [
+   1264451,
+   "dexs"
+  ],
+  "bdex-v3": [
+   58309892,
+   "dexs"
+  ],
+  "bisonfi": [
+   5233431491,
+   "dexs"
+  ],
+  "bluefin-spot": [
+   106953521,
+   "dexs"
+  ],
+  "blur-bids": [
+   2489987,
+   "dexs"
+  ],
+  "bulbaswap-v3": [
+   21860994,
+   "dexs"
+  ],
+  "byreal": [
+   87483249,
+   "dexs"
+  ],
+  "cetus-clmm": [
+   228262836,
+   "dexs"
+  ],
+  "chainflip-amm": [
+   1099985605,
+   "dexs"
+  ],
+  "communityv3": [
+   45725318,
+   "dexs"
+  ],
+  "curve-dex": [
+   4659438582,
+   "dexs"
+  ],
+  "curve-llamalend": [
+   4360104,
+   "dexs"
+  ],
+  "deepbook-v3": [
+   165098291,
+   "dexs"
+  ],
+  "defa-by-invoicemate": [
+   32510655,
+   "dexs"
+  ],
+  "deri-v4": [
+   43946,
+   "options"
+  ],
+  "derive-v3-options": [
+   141330176,
+   "options"
+  ],
+  "dodo-amm": [
+   554078263,
+   "dexs"
+  ],
+  "ekubo": [
+   711557160,
+   "dexs"
+  ],
+  "etherfi-cash-liquid": [
+   142157880,
+   "dexs"
+  ],
+  "fables": [
+   495281192,
+   "dexs"
+  ],
+  "figure-markets-exchange": [
+   354443958,
+   "dexs"
+  ],
+  "fluid-dex": [
+   5425739272,
+   "dexs"
+  ],
+  "fluxion-network": [
+   39957021,
+   "dexs"
+  ],
+  "frax-swap": [
+   9585306,
+   "dexs"
+  ],
+  "fstswap": [
+   30326796,
+   "dexs"
+  ],
+  "futarchy-amm": [
+   21785740,
+   "dexs"
+  ],
+  "goonfi": [
+   1576052988,
+   "dexs"
+  ],
+  "hegic": [
+   99768,
+   "options"
+  ],
+  "hydration-dex": [
+   31418175,
+   "dexs"
+  ],
+  "hyperliquid-spot-orderbook": [
+   5271388218,
+   "dexs"
+  ],
+  "hyperswap-v2": [
+   3176156,
+   "dexs"
+  ],
+  "hyperswap-v3": [
+   126931127,
+   "dexs"
+  ],
+  "joe-dex": [
+   7286589,
+   "dexs"
+  ],
+  "jupiter-lend-dex": [
+   853229630,
+   "dexs"
+  ],
+  "katana-dex": [
+   7726252,
+   "dexs"
+  ],
+  "kodiak-v3": [
+   34770848,
+   "dexs"
+  ],
+  "lista-dex": [
+   598859254,
+   "dexs"
+  ],
+  "manifest-trade": [
+   3117965212,
+   "dexs"
+  ],
+  "mento-v2": [
+   55831,
+   "dexs"
+  ],
+  "merchant-moe-liquidity-book": [
+   16877499,
+   "dexs"
+  ],
+  "merlinswap": [
+   384644,
+   "dexs"
+  ],
+  "meteora-damm-v1": [
+   27280273,
+   "dexs"
+  ],
+  "meteora-damm-v2": [
+   199818580,
+   "dexs"
+  ],
+  "meteora-dlmm": [
+   3747770085,
+   "dexs"
+  ],
+  "metric-v1": [
+   9328176887,
+   "dexs"
+  ],
+  "minswap-dex": [
+   27308327,
+   "dexs"
+  ],
+  "nado-spot": [
+   16013877,
+   "dexs"
+  ],
+  "near-intents": [
+   4037255871,
+   "dexs"
+  ],
+  "nest-cl": [
+   542265068,
+   "dexs"
+  ],
+  "orca-dex": [
+   6484132233,
+   "dexs"
+  ],
+  "osmosis-dex": [
+   30032649,
+   "dexs"
+  ],
+  "pancakeswap-amm": [
+   1069599740,
+   "dexs"
+  ],
+  "pancakeswap-amm-v3": [
+   20473392182,
+   "dexs"
+  ],
+  "pancakeswap-infinity": [
+   3817799528,
+   "dexs"
+  ],
+  "pendle-v2": [
+   1108457818,
+   "dexs"
+  ],
+  "pharaoh-dlmm": [
+   437863991,
+   "dexs"
+  ],
+  "pharaoh-v3": [
+   1067722511,
+   "dexs"
+  ],
+  "plasma-one": [
+   32151787,
+   "dexs"
+  ],
+  "polymarket-international": [
+   2666908228,
+   "dexs"
+  ],
+  "potatoswap-v2": [
+   11241027,
+   "dexs"
+  ],
+  "predict-fun": [
+   382925524,
+   "dexs"
+  ],
+  "project-x": [
+   2004727629,
+   "dexs"
+  ],
+  "pulsex-v1": [
+   21790149,
+   "dexs"
+  ],
+  "pulsex-v2": [
+   21141732,
+   "dexs"
+  ],
+  "pumpswap": [
+   5842741165,
+   "dexs"
+  ],
+  "quickswap-dex": [
+   48906908,
+   "dexs"
+  ],
+  "quickswap-v3": [
+   82947912,
+   "dexs"
+  ],
+  "rain": [
+   0,
+   "dexs"
+  ],
+  "ramses-cl-v2": [
+   857957590,
+   "dexs"
+  ],
+  "raydium-amm": [
+   4381131885,
+   "dexs"
+  ],
+  "rhea-dex": [
+   253143896,
+   "dexs"
+  ],
+  "rocketswap-anubis-v2": [
+   580659664,
+   "dexs"
+  ],
+  "rysk-v12": [
+   898675,
+   "options"
+  ],
+  "sanctum-infinity": [
+   3372741,
+   "dexs"
+  ],
+  "sanctum-reserve": [
+   12931065,
+   "dexs"
+  ],
+  "saphyre-v3": [
+   209349766,
+   "dexs"
+  ],
+  "saucerswap-v1": [
+   3496169,
+   "dexs"
+  ],
+  "saucerswap-v2": [
+   34857452,
+   "dexs"
+  ],
+  "sovryn-dex": [
+   1410080,
+   "dexs"
+  ],
+  "sparkdex-v3.1": [
+   45213641,
+   "dexs"
+  ],
+  "sparkdex-v4": [
+   76533097,
+   "dexs"
+  ],
+  "spectra-v2": [
+   15201753,
+   "dexs"
+  ],
+  "ston.fi": [
+   89892760,
+   "dexs"
+  ],
+  "streamflow": [
+   24405635,
+   "dexs"
+  ],
+  "sunswap-v1": [
+   9200148,
+   "dexs"
+  ],
+  "sunswap-v2": [
+   107115126,
+   "dexs"
+  ],
+  "sunswap-v3": [
+   1881558952,
+   "dexs"
+  ],
+  "sunswap-v4": [
+   823634743,
+   "dexs"
+  ],
+  "superfluid": [
+   2783808,
+   "dexs"
+  ],
+  "sushiswap": [
+   27359090,
+   "dexs"
+  ],
+  "sushiswap-v3": [
+   273598383,
+   "dexs"
+  ],
+  "syncswap": [
+   10156548,
+   "dexs"
+  ],
+  "temple": [
+   542072091,
+   "dexs"
+  ],
+  "tempo-stablecoin-dex": [
+   6042463,
+   "dexs"
+  ],
+  "tessera-v": [
+   2688355214,
+   "dexs"
+  ],
+  "thorchain-dex": [
+   4023669434,
+   "dexs"
+  ],
+  "uniswap-v2": [
+   638914646,
+   "dexs"
+  ],
+  "uniswap-v3": [
+   34295773834,
+   "dexs"
+  ],
+  "uniswap-v4": [
+   28379430414,
+   "dexs"
+  ],
+  "unit": [
+   2596911607,
+   "dexs"
+  ],
+  "vvs-standard": [
+   38369927,
+   "dexs"
+  ],
+  "wise-token": [
+   133191,
+   "dexs"
+  ],
+  "xrpl-dex": [
+   184584717,
+   "dexs"
+  ],
+  "yield-basis": [
+   28130004,
+   "dexs"
+  ]
+ }
+}

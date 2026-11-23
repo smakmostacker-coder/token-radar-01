@@ -104,6 +104,7 @@ export interface BoardRow {
   website: string | null;
   raised_usd: number | null;
   raised_rounds: number | null;
+  volume_30d_usd: number | null;
   signal: Signal | null;
   age_days: number | null;
   implied_value_usd: number;
@@ -147,17 +148,20 @@ export type SocialsMap = ReadonlyMap<string, Socials>;
 
 /**
  * A sourced airdrop signal: what the hint is, who reported it, and where it
- * was seen. `confirmed` is the stricter verdict the Watchlist tab applies:
- * the team has publicly committed to a token and an airdrop (an explicit
- * public statement, or an official points-to-token conversion commitment).
- * A points programme, a roadmap mention or a rumour is a signal, never a
- * confirmation.
+ * was seen. The Watchlist tab holds the sourced set in two kinds, told apart
+ * by two fields: `confirmed` — the team has publicly committed to a token
+ * and an airdrop (an explicit public statement, or an official
+ * points-to-token conversion commitment) — and `points` — the protocol runs
+ * a points/XP programme that could convert into an airdrop, which is a
+ * potential, never a confirmation. A roadmap mention or a rumour is a
+ * signal, and neither.
  */
 export interface Signal {
   note: string;
   source: string;
   ref: string;
   confirmed: boolean;
+  points: boolean;
 }
 
 /** Signals by slug, from lib/signals.json (checked by hand against the named sources). */
@@ -175,11 +179,26 @@ export interface Raised {
 /** Raises by slug, from lib/raises.json (DefiLlama's per-protocol raises records, build-time fetch). */
 export type RaisesMap = ReadonlyMap<string, Raised>;
 
+/**
+ * A protocol's trailing-30-day trading volume as DefiLlama's public volume
+ * datasets record it, and which dataset carried it. Absent means no figure
+ * on that public record (the derivatives overview is paywalled, so
+ * perpetuals protocols are absent) — never an estimate.
+ */
+export interface Volume {
+  total30d_usd: number;
+  dataset: string;
+}
+
+/** Volumes by slug, from lib/volumes.json (DefiLlama's public dexs/options volume overviews, build-time fetch). */
+export type VolumesMap = ReadonlyMap<string, Volume>;
+
 /** The build-time datasets the program joins onto the snapshot, each with its own provenance. */
 export interface ExtraData {
   socials: SocialsMap;
   signals: SignalsMap;
   raises: RaisesMap;
+  volumes: VolumesMap;
 }
 
 /**
@@ -269,6 +288,7 @@ export interface CatalogueRow {
   website: string | null;
   raised_usd: number | null;
   raised_rounds: number | null;
+  volume_30d_usd: number | null;
   age_days: number | null;
   status: 'ranked' | 'traded' | 'screened';
   status_label: string;
@@ -505,7 +525,7 @@ export function farmPlan(p: Protocol, age: number | null): string[] {
 
 const NO_SOCIALS: Socials = { twitter: null, website: null };
 
-export const EMPTY_EXTRAS: ExtraData = { socials: new Map(), signals: new Map(), raises: new Map() };
+export const EMPTY_EXTRAS: ExtraData = { socials: new Map(), signals: new Map(), raises: new Map(), volumes: new Map() };
 
 /** The ranked board: every watchlist slug, plus every other rankable protocol the snapshot carries. */
 export function buildBoard(snapshot: Snapshot, extras: ExtraData): BoardRow[] {
@@ -534,6 +554,7 @@ export function buildBoard(snapshot: Snapshot, extras: ExtraData): BoardRow[] {
     website: (extras.socials.get(s.p.slug) ?? NO_SOCIALS).website,
     raised_usd: extras.raises.get(s.p.slug)?.total_usd ?? null,
     raised_rounds: extras.raises.get(s.p.slug)?.rounds ?? null,
+    volume_30d_usd: extras.volumes.get(s.p.slug)?.total30d_usd ?? null,
     signal: extras.signals.get(s.p.slug) ?? null,
     age_days: s.age,
     implied_value_usd: s.implied,
@@ -594,6 +615,7 @@ export function buildCatalogue(snapshot: Snapshot, extras: ExtraData, board: Boa
       website: socials.website,
       raised_usd: extras.raises.get(p.slug)?.total_usd ?? null,
       raised_rounds: extras.raises.get(p.slug)?.rounds ?? null,
+      volume_30d_usd: extras.volumes.get(p.slug)?.total30d_usd ?? null,
       age_days: ageInDays(snapshot.as_of, p.listed_at),
     };
     const ranked = rankedBy.get(p.slug);

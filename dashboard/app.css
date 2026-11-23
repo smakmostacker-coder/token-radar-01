@@ -159,6 +159,7 @@ td.rank { color: var(--faint); font-variant-numeric: tabular-nums; }
   padding: 1px 5px; border-radius: 4px; vertical-align: 2px; margin-left: 6px;
 }
 .tag.wl { background: var(--tag-bg); color: var(--tag-ink); border: 1px solid var(--tag-line); }
+.tag.conf { background: var(--accent-soft); color: var(--accent); border: 1px solid #bfe0d4; }
 .tag.sig { background: var(--accent-soft); color: var(--accent); border: 1px solid #bfe0d4; }
 .tag.off { background: #eef1f0; color: var(--muted); border: 1px solid var(--line); }
 .up { color: var(--accent); }

@@ -13,7 +13,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildRadar, loadSnapshot, toDataScript, validateBoard } from './lib/model.ts';
-import type { ExtraData, Raised, Signal, Socials } from './lib/model.ts';
+import type { ExtraData, Raised, Signal, Socials, Volume } from './lib/model.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
 
 /** Read one of the build-time datasets in lib/; a missing or unreadable file reads as empty. */
@@ -34,8 +34,10 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
  * The build-time datasets, each baked into the repository because this
  * program runs with no network, and each with its provenance in its file's
  * meta block: socials and raises from DefiLlama's records (lib/socials.json,
- * lib/raises.json), airdrop signals checked by hand (lib/signals.json). A
- * slug with no record shows nothing for that field; nothing is guessed.
+ * lib/raises.json), 30-day trading volume from DefiLlama's public volume
+ * datasets (lib/volumes.json), airdrop signals checked by hand
+ * (lib/signals.json). A slug with no record shows nothing for that field;
+ * nothing is guessed.
  */
 function loadExtras(): ExtraData {
   const socials = new Map<string, Socials>();
@@ -50,7 +52,7 @@ function loadExtras(): ExtraData {
     const note = str(o.note);
     const source = str(o.source);
     const ref = str(o.ref);
-    if (note !== null && source !== null && ref !== null) signals.set(slug, { note, source, ref, confirmed: o.confirmed === true });
+    if (note !== null && source !== null && ref !== null) signals.set(slug, { note, source, ref, confirmed: o.confirmed === true, points: o.points === true });
   }
   const raises = new Map<string, Raised>();
   for (const [slug, rec] of Object.entries(readDataset('raises.json').by_slug ?? {})) {
@@ -66,7 +68,15 @@ function loadExtras(): ExtraData {
       last_date: str(rec[4]),
     });
   }
-  return { socials, signals, raises };
+  const volumes = new Map<string, Volume>();
+  for (const [slug, rec] of Object.entries(readDataset('volumes.json').by_slug ?? {})) {
+    if (!Array.isArray(rec)) continue;
+    const total30d = num(rec[0]);
+    const dataset = str(rec[1]);
+    if (total30d === null || dataset === null) continue;
+    volumes.set(slug, { total30d_usd: total30d, dataset });
+  }
+  return { socials, signals, raises, volumes };
 }
 
 const repoDir = fileURLToPath(new URL('.', import.meta.url));
