@@ -1,9 +1,13 @@
-// Launch Radar page: four views over one ranked board — All protocols, Top
-// protocols (the biggest by TVL), Early protocols (tracked under six
-// months) and the Watchlist (the house list plus protocols carrying a
-// sourced airdrop signal) — plus a detail view per protocol and a method
-// page. No network: every figure comes from ../data.js, written by the
-// entry program. Socials and links are shown as text, never as live links.
+// Launch Radar page: four views — All protocols (every protocol in the
+// snapshot: the ranked board first, then the already-traded and the
+// screened-out, each tagged with its status), Top protocols (the biggest
+// by TVL), Early protocols (tracked under six months) and the Watchlist
+// (the house list plus protocols carrying a sourced airdrop signal) —
+// plus a detail view per protocol and a method page. Only All carries the
+// board's rank numbers; Top, Early and Watchlist number their rows in the
+// order shown. No network: every figure comes from ../data.js, written by
+// the entry program. Socials and links are shown as text, never as live
+// links.
 
 'use strict';
 
@@ -52,18 +56,18 @@ function socialsHTML(r) {
 }
 
 const bySlug = new Map(R.rows.map((r) => [r.slug, r]));
-const liveBySlug = new Map(R.live.map((r) => [r.slug, r]));
+const catBySlug = new Map(R.catalogue.map((c) => [c.slug, c]));
 const kitCount = R.rows.filter((r) => r.on_watchlist).length;
-const signalRows = R.rows.filter((r) => r.signal !== null);
-const watchCount = R.rows.filter((r) => r.on_watchlist || r.signal !== null).length;
+const confirmedRows = R.rows.filter((r) => r.signal?.confirmed);
+const confirmedCount = confirmedRows.length;
 
 /* ---------- header, stats, footer ---------- */
 
 document.getElementById('stats').innerHTML = [
   [R.counts.scanned, 'protocols scanned'],
   [R.counts.board, 'ranked pre-token'],
-  [watchCount, 'on the watchlist'],
-  [R.counts.live, 'already traded'],
+  [confirmedCount, 'confirmed airdrops'],
+  [R.counts.traded, 'already traded'],
   [esc(R.as_of), 'snapshot date'],
 ]
   .map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`)
@@ -113,12 +117,12 @@ function go(patch) {
 const SEGMENTS = {
   all: {
     title: 'All protocols',
-    blurb: 'Every protocol the screen lets through, ranked by implied value: what its token would be worth if it launched today at the multiple its own category already trades at.',
-    rows: () => R.rows,
+    blurb: 'Every protocol in the snapshot. The ranked board comes first, in rank order — ranked by implied value: what its token would be worth if it launched today at the multiple its own category already trades at. Below it, every other protocol, tagged with its status: already traded, or not ranked with the screen’s reason.',
+    rows: () => R.catalogue,
   },
   top: {
     title: 'Top protocols',
-    blurb: `The ${TOP_N} biggest ranked protocols by TVL — the most established names still without a token. Rank here is by TVL; the board rank and implied value travel with each row.`,
+    blurb: `The ${TOP_N} biggest ranked protocols by TVL — the most established names still without a token. Numbered here by TVL, largest first; each protocol's board rank is on its detail page.`,
     rows: () => [...R.rows].sort((a, b) => b.tvl_usd - a.tvl_usd).slice(0, TOP_N),
   },
   early: {
@@ -128,24 +132,24 @@ const SEGMENTS = {
   },
   watchlist: {
     title: 'Watchlist',
-    blurb: 'The house watchlist (DefiLlama record: no token, at or above the floor, no wrapped or bridged product) plus protocols whose team has publicly signalled a token. Every row states why it is here; a signal names its source, and an unsourced hunch never makes this list.',
-    rows: () => R.rows.filter((r) => r.on_watchlist || r.signal !== null),
+    blurb: 'Confirmed airdrops only: a protocol belongs here when its team has publicly committed to a token and an airdrop — an explicit public statement by the team or its leadership, or an official points-to-token conversion commitment. Points programmes, roadmap mentions, rumours and likely-someday hints do not qualify. Every row states its confirmation and its source.',
+    rows: () => R.rows.filter((r) => r.signal?.confirmed),
   },
 };
 
 function whyLine(r) {
-  if (r.signal) return `<b>Signal:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span>`;
-  return `<b>House watchlist:</b> records no token at or above the ${money(R.floor_usd)} TVL floor in the snapshot's DefiLlama record.`;
+  if (r.signal) return `<b>Confirmed:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span>`;
+  return `<b>House list:</b> records no token at or above the ${money(R.floor_usd)} TVL floor in the snapshot's DefiLlama record.`;
 }
 
 /* ---------- board ---------- */
 
 const SORTS = {
-  rank: (a, b) => a.rank - b.rank,
+  rank: (a, b) => (a.seq ?? a.rank) - (b.seq ?? b.rank),
   name: (a, b) => a.name.localeCompare(b.name),
   tvl: (a, b) => b.tvl_usd - a.tvl_usd,
   change: (a, b) => (b.change_7d ?? -1e9) - (a.change_7d ?? -1e9),
-  implied: (a, b) => b.implied_value_usd - a.implied_value_usd,
+  implied: (a, b) => (b.implied_value_usd ?? -1) - (a.implied_value_usd ?? -1),
   raised: (a, b) => (b.raised_usd ?? -1) - (a.raised_usd ?? -1),
   age: (a, b) => (a.age_days ?? 1e9) - (b.age_days ?? 1e9),
 };
@@ -165,10 +169,16 @@ function filteredRows(state) {
   return sorted;
 }
 
-function rowHTML(r, state) {
-  const tags = `${r.on_watchlist ? '<span class="tag wl">WATCHLIST</span>' : ''}${r.signal ? '<span class="tag sig">SIGNAL</span>' : ''}`;
+/**
+ * A ranked-board row for Top, Early and Watchlist. The number is the
+ * view's own sequence — the row's position in the order shown, renumbered
+ * whenever the view is sorted or filtered — never the board rank (that
+ * lives on the detail page). Tags appear in the Watchlist view alone.
+ */
+function rowHTML(r, state, idx) {
+  const tags = state.segment === 'watchlist' ? '<span class="tag wl">WATCHLIST</span>' : '';
   const main = `<tr data-slug="${esc(r.slug)}">
-    <td class="rank">${r.rank}</td>
+    <td class="rank">${idx + 1}</td>
     <td><span class="pname">${esc(r.name)}</span>${tags}${socialsHTML(r)}</td>
     <td class="sector">${esc(r.sector_label)}</td>
     <td class="chains">${esc(r.chains.slice(0, 2).join(', '))}${r.chains.length > 2 ? ` +${r.chains.length - 2}` : ''}</td>
@@ -182,34 +192,31 @@ function rowHTML(r, state) {
   return main + `<tr><td></td><td colspan="8" class="sigline">${whyLine(r)}</td></tr>`;
 }
 
-function tradedHTML() {
-  const body = R.live
-    .map(
-      (r) => `<tr>
-      <td><span class="pname">${esc(r.name)}</span>${socialsHTML(r)}</td>
-      <td class="sector">${esc(r.sector_label)}</td>
-      <td class="chains">${esc(r.chains.slice(0, 2).join(', '))}${r.chains.length > 2 ? ` +${r.chains.length - 2}` : ''}</td>
-      <td class="num">${money(r.tvl_usd)}</td>
-      <td class="num"><b>${money(r.mcap_usd)}</b></td>
-      <td class="num">${r.tvl_multiple === null ? '—' : `×${r.tvl_multiple.toFixed(2)}`}</td>
-      <td class="num">${money(r.raised_usd)}</td>
-    </tr>`,
-    )
-    .join('');
-  return `<section class="panel traded">
-    <div class="panel-head"><h2>Already traded — shown apart, never ranked</h2>
-    <p>Protocols whose token already exists, at the market's own values. Their market-cap/TVL ratios are the peer multiples the model reads; they are not launch candidates and the model never scores them.</p></div>
-    <div class="tbl-wrap"><table class="board"><thead><tr>
-      <th>Protocol</th><th>Sector</th><th>Chains</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th><th class="num">Raised</th>
-    </tr></thead><tbody>${body}</tbody></table></div>
-  </section>`;
+/**
+ * A catalogue row for All: ranked protocols carry their board rank and
+ * implied value; every other protocol carries its status tag instead —
+ * already traded, or not ranked with the screen's reason.
+ */
+function allRowHTML(c) {
+  const tag = c.status === 'ranked' ? '' : `<span class="tag off">${esc(c.status_tag)}</span>`;
+  return `<tr data-slug="${esc(c.slug)}">
+    <td class="rank">${c.rank ?? '—'}</td>
+    <td><span class="pname">${esc(c.name)}</span>${tag}${socialsHTML(c)}</td>
+    <td class="sector">${esc(c.sector_label)}</td>
+    <td class="chains">${esc(c.chains.slice(0, 2).join(', '))}${c.chains.length > 2 ? ` +${c.chains.length - 2}` : ''}</td>
+    <td class="num">${money(c.tvl_usd)}</td>
+    <td class="num">${pctCell(c.change_7d)}</td>
+    <td class="num">${c.implied_value_usd === null ? '—' : `<b>${money(c.implied_value_usd)}</b>`}</td>
+    <td class="num">${money(c.raised_usd)}</td>
+    <td class="num">${ageText(c.age_days)}</td>
+  </tr>`;
 }
 
 function renderBoard(state) {
   const seg = SEGMENTS[state.segment];
   const segRows = seg.rows();
   const sectors = [...new Set(segRows.map((r) => r.sector))].sort();
-  const chains = [...new Set(R.rows.flatMap((r) => r.chains))].sort();
+  const chains = [...new Set(segRows.flatMap((r) => r.chains))].sort();
   const chips = sectors
     .map((s) => `<button class="chip ${state.sector === s ? 'on' : ''}" data-sector="${esc(s)}">${esc(s)} <small>${segRows.filter((r) => r.sector === s).length}</small></button>`)
     .join('');
@@ -242,13 +249,14 @@ function renderBoard(state) {
       </tr></thead>
       <tbody id="tbody"></tbody>
     </table></div>
-  </section>
-  ${state.segment === 'all' ? tradedHTML() : ''}`;
+  </section>`;
 
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.getAttribute('data-seg') === state.segment));
   const update = () => {
     const rows = filteredRows(state);
-    document.getElementById('tbody').innerHTML = rows.length ? rows.map((r) => rowHTML(r, state)).join('') : '<tr><td colspan="9" class="empty">No protocol matches these filters.</td></tr>';
+    document.getElementById('tbody').innerHTML = rows.length
+      ? rows.map((r, i) => (state.segment === 'all' ? allRowHTML(r) : rowHTML(r, state, i))).join('')
+      : '<tr><td colspan="9" class="empty">No protocol matches these filters.</td></tr>';
     document.getElementById('count-note').textContent = `${rows.length} of ${segRows.length} shown`;
     view.querySelectorAll('#tbody tr[data-slug]').forEach((tr) =>
       tr.addEventListener('click', () => {
@@ -276,14 +284,50 @@ function renderBoard(state) {
 
 /* ---------- detail ---------- */
 
+/** Detail for a protocol the board does not rank: its status, its figures, and why it is unranked. */
+function renderCatalogueDetail(c, back) {
+  const raisedBox = c.raised_usd === null
+    ? '<p>No fundraising round is on DefiLlama’s record for this protocol.</p>'
+    : `<p><b>${moneyFull(c.raised_usd)}</b> across ${c.raised_rounds} recorded round${c.raised_rounds === 1 ? '' : 's'} (DefiLlama raises records).</p>`;
+  const statusBox = c.status === 'traded'
+    ? `<section class="box"><h3>Status — already traded</h3><p>Its token already exists, so it is not a launch candidate and the model never scores it. It is listed at the market's own values; its category's market-cap/TVL ratios are among the peer multiples the model reads.</p></section>`
+    : `<section class="box"><h3>Status — ${esc(c.status_label.toLowerCase())}</h3><p>The screen leaves it unranked: the ranked board is for independent protocols still to launch, and this is ${esc(c.status_label.replace(/^Not ranked — /, ''))}. It stays visible here so the screen's working can be checked, not hidden.</p></section>`;
+  view.innerHTML = `
+  ${back}
+  <div class="detail-head">
+    <h2>${esc(c.name)}<span class="tag off">${esc(c.status_tag)}</span></h2>
+    <p class="detail-meta">${esc(c.sector_label)} · ${esc(c.chains.join(', ') || 'no chains recorded')} · ${esc(c.status_label.toLowerCase())}${c.twitter ? ` · <span class="x">X @${esc(c.twitter)}</span>` : ''}${c.website ? ` · ${esc(siteText(c.website))}` : ''}</p>
+  </div>
+  <section class="stats dgrid">
+    ${[
+      [moneyFull(c.tvl_usd), 'TVL'],
+      [c.mcap_usd === null ? 'no token recorded' : moneyFull(c.mcap_usd), c.mcap_usd === null ? 'token record' : `market cap${c.symbol ? ` · ${esc(c.symbol)}` : ''}`],
+      [c.change_7d === null ? 'n/a' : `${c.change_7d > 0 ? '+' : ''}${c.change_7d.toFixed(2)}%`, 'TVL change, 7 days'],
+      [c.age_days === null ? 'unknown' : `${c.age_days} days`, 'tracked by DefiLlama'],
+    ]
+      .map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`)
+      .join('')}
+  </section>
+  <div class="cols">
+    ${statusBox}
+    <section class="box">
+      <h3>Money raised</h3>
+      ${raisedBox}
+    </section>
+  </div>`;
+  window.scrollTo(0, 0);
+}
+
 function renderDetail(slug) {
   const r = bySlug.get(slug);
   const back = `<button class="backbtn" onclick="history.back()">← Back</button>`;
   if (r === undefined) {
-    const l = liveBySlug.get(slug);
-    view.innerHTML = back + (l
-      ? `<div class="detail-head"><h2>${esc(l.name)}</h2><p class="detail-meta">${esc(l.sector_label)} · already traded — market cap ${moneyFull(l.mcap_usd)} at TVL ${moneyFull(l.tvl_usd)}</p></div>`
-      : '<p>No such protocol on this board.</p>');
+    const c = catBySlug.get(slug);
+    if (c === undefined) {
+      view.innerHTML = back + '<p>No such protocol in the snapshot.</p>';
+      return;
+    }
+    renderCatalogueDetail(c, back);
     return;
   }
   const m = r.model;
@@ -293,7 +337,7 @@ function renderDetail(slug) {
   view.innerHTML = `
   ${back}
   <div class="detail-head">
-    <h2>${esc(r.name)}${r.on_watchlist ? '<span class="tag wl">WATCHLIST</span>' : ''}${r.signal ? '<span class="tag sig">SIGNAL</span>' : ''}</h2>
+    <h2>${esc(r.name)}${r.signal?.confirmed ? '<span class="tag wl">WATCHLIST</span>' : ''}</h2>
     <p class="detail-meta">${esc(r.sector_label)} · ${esc(r.chains.join(', ') || 'no chains recorded')} · records no token${r.twitter ? ` · <span class="x">X @${esc(r.twitter)}</span>` : ''}${r.website ? ` · ${esc(siteText(r.website))}` : ''}</p>
   </div>
   <section class="stats dgrid">
@@ -323,7 +367,9 @@ function renderDetail(slug) {
         <h3>Money raised</h3>
         ${raisedBox}
       </section>
-      ${r.signal || r.on_watchlist ? `<section class="box sigbox"><h3>Why it is on the watchlist</h3><p>${whyLine(r)}</p></section>` : ''}
+      ${r.signal?.confirmed ? `<section class="box sigbox"><h3>On the watchlist — confirmed airdrop</h3><p>${whyLine(r)}</p></section>` : ''}
+      ${r.signal && !r.signal.confirmed ? `<section class="box"><h3>Airdrop signal — not confirmed</h3><p><b>Signal:</b> ${esc(r.signal.note)} <span>— ${esc(r.signal.source)} · ${esc(r.signal.ref)}</span></p><p>A signal is not a public commitment to a token and an airdrop, so this protocol is not on the Watchlist tab, which holds confirmed airdrops only.</p></section>` : ''}
+      ${!r.signal && r.on_watchlist ? `<section class="box"><h3>On the house list</h3><p>The bounty's own watchlist: it records no token at or above the ${money(R.floor_usd)} TVL floor in the snapshot's DefiLlama record, and the gate requires it ranked on this board. House-list membership is a coverage rule, not an airdrop confirmation — the Watchlist tab holds only protocols whose team has publicly committed to a token and an airdrop, and no such commitment is on record for this one.</p></section>` : ''}
     </div>
     <section class="box">
       <h3>Farm plan — six steps</h3>
@@ -345,7 +391,8 @@ function renderMethod() {
     <h3>The screen</h3>
     <p>A protocol ranks only if it records no token and is an independent protocol: not a bridge, canonical bridge or cross-chain bridge; not a liquid staking, liquid restaking, restaked-BTC, anchored-BTC, decentralised-BTC or stablecoin-wrapper product of a token that already trades; not an exchange (CEX) or a product carrying an exchange's name; not a chain itself; and not a versioned pool of another protocol. The house watchlist is exempt from the product screen — the bounty requires its coverage, and it is the floor, never the ceiling.</p>
     <h3>The four views</h3>
-    <p><b>All protocols</b> is the full ranked board. <b>Top protocols</b> is its ${TOP_N} largest by TVL (the snapshot carries no trading-volume field, so size is TVL and the activity gauge shown is the 7-day TVL change). <b>Early protocols</b> is tracked for ${EARLY_DAYS} days or fewer. <b>Watchlist</b> is the house list (${kitCount} protocols) plus ${signalRows.length} protocols carrying a sourced signal — a points programme, a public token statement by the team, or a token-teasing post — each stated on its row with its source. The user's example of the genre, Sol Incinerator's airdrop-teasing post, is exactly the kind of signal meant; Sol Incinerator itself is not in the snapshot (it sits below the snapshot's TVL floor), so it cannot appear here.</p>
+    <p><b>All protocols</b> lists every protocol in the snapshot (${R.counts.scanned}): the ranked board first, in rank order, then the ${R.counts.traded} already traded and the ${R.counts.screened} the screen leaves unranked, each tagged with its status and, for the unranked, the screen's reason. Only All carries the board's rank numbers. <b>Top protocols</b> is the board's ${TOP_N} largest by TVL (the snapshot carries no trading-volume field, so size is TVL and the activity gauge shown is the 7-day TVL change), numbered by TVL. <b>Early protocols</b> is tracked for ${EARLY_DAYS} days or fewer. Top, Early and Watchlist number their rows in the order shown.</p>
+    <p><b>Watchlist</b> is confirmed airdrops only. A protocol joins it when its team has publicly committed to a token and an airdrop — an explicit public statement by the team or its leadership, or an official points-to-token conversion commitment — with the statement's source named on its row. On this snapshot ${confirmedCount} protocol qualifies: ${confirmedRows.map((r) => esc(r.name)).join(', ')}. A points programme, a roadmap mention, a rumour or a likely-someday hint is a signal, not a confirmation: marginfi (points carried into its Project 0 relaunch; a token named in a later roadmap), Loopscale (points live; a conversion reported by a third-party tracker, not committed by the team) and Hyperbeat (a points programme and a ticker purchase) carry sourced signals, recorded on their detail pages, and stay off this tab. The house list (${kitCount} protocols) is the bounty's own list, not this tab: the gate requires every house-list protocol ranked on the board, and all ${kitCount} are — but house-list membership follows the house's coverage rule (no token recorded, at or above the floor), and is not an airdrop confirmation, so it does not put a protocol on the Watchlist tab. The genre's textbook signal, Sol Incinerator's airdrop-teasing post, would still not qualify its protocol here — a tease is not a commitment — and Sol Incinerator is not in the snapshot anyway (it sits below the snapshot's TVL floor).</p>
     <h3>Field provenance</h3>
     <table>
       <tr><th>Field</th><th>Source</th></tr>

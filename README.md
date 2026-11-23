@@ -6,7 +6,7 @@
 
 An entry for the make.fun bounty [token-radar-01](https://make.fun/bounty/token-radar-01): build the best token launch radar.
 
-Launch Radar reads the sealed DefiLlama snapshot (758 protocols) and ranks the protocols that record no token yet and are plausible token-launch candidates — all 40 watchlist protocols plus 150 more the screen lets through, 190 rows — and shows a reader how to farm each one. Protocols whose token already trades are shown apart, at the market's own values.
+Launch Radar reads the sealed DefiLlama snapshot (758 protocols) and ranks the protocols that record no token yet and are plausible token-launch candidates — all 40 house-list protocols plus 150 more the screen lets through, 190 rows — and shows a reader how to farm each one. The dashboard's All view lists all 758 snapshot protocols: the ranked board first, then every other protocol tagged with its status — already traded (at the market's own values) or not ranked, with the screen's reason. The scored board (`board.json`) stays exactly the ranked set.
 
 ## The screen
 
@@ -27,12 +27,12 @@ No protocol's name is special-cased: the same function scores every row, and eve
 
 `dashboard/` is a static page with no network calls, in four views over the one board:
 
-- **All protocols** — the full ranked board, with the already-traded set shown below it, apart.
-- **Top protocols** — the 25 largest by TVL (the snapshot carries no volume field; the 7-day TVL change is the activity gauge).
-- **Early protocols** — tracked for 180 days or fewer.
-- **Watchlist** — the 40 house protocols plus 5 carrying a sourced airdrop signal (a points programme, a public token statement by the team); every row states why it is there, with the signal's source.
+- **All protocols** — every protocol in the snapshot (758): the ranked board first, in rank order, then the already-traded and the screened-out, each tagged with its status. Only this view carries the board's rank numbers.
+- **Top protocols** — the 25 largest by TVL (the snapshot carries no volume field; the 7-day TVL change is the activity gauge), numbered 1–25 by TVL.
+- **Early protocols** — tracked for 180 days or fewer, numbered in the order shown.
+- **Watchlist** — confirmed airdrops only: a protocol belongs here when its team has publicly committed to a token and an airdrop (an explicit public statement, or an official points-to-token conversion commitment), with the source named on its row. On this snapshot exactly one qualifies: Polymarket International, whose CMO said on the record that there will be a token and an airdrop. The 40 house-list protocols stay ranked on the board — the gate requires their coverage — but house-list membership is the bounty's own coverage rule, not an airdrop confirmation, so it does not put them on this tab. Sourced signals that fall short of a commitment (marginfi, Loopscale, Hyperbeat) are recorded on their detail pages and stay off the tab.
 
-Each row carries its sector (mapped from the DefiLlama category), chains, TVL, 7-day change, implied value, money raised, and age, plus its X handle and website as text — the page ships no outbound links. Filters: sector chips, chain, minimum TVL, search; every column sorts. A detail view per protocol shows the model's arithmetic, the raise record, the watchlist basis or signal, and a six-step farm plan with its cost and its time. A Method & sources view documents the model, the screen, and the provenance below.
+Each row carries its sector (mapped from the DefiLlama category), chains, TVL, 7-day change, implied value, money raised, and age, plus its X handle and website as text — the page ships no outbound links. Filters: sector chips, chain, minimum TVL, search; every column sorts. Top, Early and Watchlist number their rows in the order shown. A detail view per protocol shows the model's arithmetic, the raise record, its house-list basis, signal or confirmation, and a six-step farm plan with its cost and its time. A Method & sources view documents the model, the screen, and the provenance below.
 
 ## Sources
 
@@ -42,7 +42,7 @@ Every field is traceable to a named source; nothing is estimated or scraped from
 - **Sector**: mapped from the snapshot's DefiLlama category by the table in `lib/model.ts` (Lending → DeFi · Lending, Dexs → DeFi · DEX, Derivatives → DeFi · Perps, Risk Curators → DeFi · Vault Curators, and so on).
 - **X handle and website**: DefiLlama's live protocol records (their `twitter` and `url` fields), fetched 2026-11-23 and baked into `lib/socials.json`, because the program runs with no network. 752 of the snapshot's 758 protocols are covered; a protocol with no record shows none — none is guessed.
 - **Money raised**: DefiLlama's raises records, read per protocol on 2026-11-23 (the bulk raises endpoint is paywalled, so each board protocol's own record was read) and totalled in `lib/raises.json`. Amounts are converted from DefiLlama's millions denomination. 55 board protocols have a raise on record; a dash means none is recorded — never an estimate.
-- **Signals**: checked by hand on 2026-11-23 against the source named on each row, stored in `lib/signals.json`. An unsourced hunch never makes the watchlist.
+- **Signals**: checked by hand on 2026-11-23 against the source named on each row, stored in `lib/signals.json`, each with a `confirmed` verdict under the Watchlist bar above. An unsourced hunch is never recorded; a sourced signal that is not a public commitment is recorded as a signal and keeps its protocol off the Watchlist tab.
 - **Beyond DefiLlama**: the ranked board's rows are the snapshot's protocols — the bounty gate accepts no other slugs. A November 2026 sweep for credible pre-token protocols DefiLlama does not track added none: the strongest candidates (Lighter, Paradex, GRVT, Pacifica, StandX, Ethereal, Extended) each turned out to be tracked by DefiLlama after all, or to have launched a token already, or both. Sol Incinerator — the user's example of an airdrop-teasing protocol — is not in the snapshot at all, so it cannot be carried.
 
 ## Run it

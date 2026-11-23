@@ -35,6 +35,12 @@
 // protocols DefiLlama does not track (November 2026) added none: every
 // credible candidate checked was already tracked there or already had a
 // token, so this board invents no off-DefiLlama rows.
+//
+// The scored board is the ranked set alone. Beside it the program writes a
+// catalogue of every protocol in the snapshot (buildCatalogue) as display
+// data for the dashboard's All view, so a reader can see the whole field —
+// the ranked rows first, then the already-traded and the screened-out, each
+// tagged with its status and, for the screened-out, the screen's reason.
 
 /** One protocol record: the ten fields the sealed snapshot carries. */
 export interface Protocol {
@@ -139,11 +145,19 @@ export interface Socials {
 /** Socials by slug, from lib/socials.json (DefiLlama's live records, build-time fetch). */
 export type SocialsMap = ReadonlyMap<string, Socials>;
 
-/** A sourced airdrop signal: what the hint is, who reported it, and where it was seen. */
+/**
+ * A sourced airdrop signal: what the hint is, who reported it, and where it
+ * was seen. `confirmed` is the stricter verdict the Watchlist tab applies:
+ * the team has publicly committed to a token and an airdrop (an explicit
+ * public statement, or an official points-to-token conversion commitment).
+ * A points programme, a roadmap mention or a rumour is a signal, never a
+ * confirmation.
+ */
 export interface Signal {
   note: string;
   source: string;
   ref: string;
+  confirmed: boolean;
 }
 
 /** Signals by slug, from lib/signals.json (checked by hand against the named sources). */
@@ -233,7 +247,38 @@ export function sectorFor(category: string | null): Sector {
   return { sector: 'Other', label: 'Other · Uncategorized' };
 }
 
-/** The dashboard's dataset: the ranked rows, the traded set, the model's weights. */
+/**
+ * One line of the full catalogue the All view lists: every protocol in the
+ * snapshot, ranked or not. A ranked protocol carries its board rank and
+ * implied value; a traded one is tagged as already traded; a screened-out
+ * one is tagged not ranked, with the screen's reason. The catalogue is
+ * display data only — the scored board (board.json) stays the ranked set.
+ */
+export interface CatalogueRow {
+  slug: string;
+  name: string;
+  category: string | null;
+  chains: string[];
+  tvl_usd: number;
+  change_7d: number | null;
+  mcap_usd: number | null;
+  symbol: string | null;
+  sector: string;
+  sector_label: string;
+  twitter: string | null;
+  website: string | null;
+  raised_usd: number | null;
+  raised_rounds: number | null;
+  age_days: number | null;
+  status: 'ranked' | 'traded' | 'screened';
+  status_label: string;
+  status_tag: string;
+  rank: number | null;
+  implied_value_usd: number | null;
+  seq: number;
+}
+
+/** The dashboard's dataset: the ranked rows, the traded set, the full catalogue, the model's weights. */
 export interface RadarData {
   as_of: string;
   source: string;
@@ -241,9 +286,10 @@ export interface RadarData {
   model_version: string;
   weights: typeof WEIGHTS;
   global_multiple: number;
-  counts: { scanned: number; watchlist: number; board: number; early: number; live: number };
+  counts: { scanned: number; watchlist: number; board: number; early: number; live: number; traded: number; screened: number };
   rows: BoardRow[];
   live: LiveRow[];
+  catalogue: CatalogueRow[];
 }
 
 export class SnapshotError extends Error {
@@ -496,6 +542,85 @@ export function buildBoard(snapshot: Snapshot, extras: ExtraData): BoardRow[] {
   }));
 }
 
+const BRIDGE_CATEGORIES: ReadonlySet<string> = new Set(['Bridge', 'Canonical Bridge', 'Cross Chain Bridge']);
+const WRAPPED_CATEGORIES: ReadonlySet<string> = new Set([
+  'Liquid Staking',
+  'Liquid Restaking',
+  'Restaked BTC',
+  'Anchor BTC',
+  'Decentralized BTC',
+  'Stablecoin Wrapper',
+]);
+
+/**
+ * Why the screen leaves a pre-token protocol unranked, in the screen's own
+ * terms: the same checks isRankable applies, named one by one so the All
+ * view can tag the row instead of hiding it.
+ */
+export function notRankedReason(p: Protocol): { label: string; tag: string } {
+  if (p.category !== null && BRIDGE_CATEGORIES.has(p.category)) return { label: 'Not ranked — bridge product', tag: 'NOT RANKED — BRIDGE' };
+  if (p.category !== null && WRAPPED_CATEGORIES.has(p.category))
+    return { label: 'Not ranked — wrapped or staked product', tag: 'NOT RANKED — WRAPPED / STAKED' };
+  if (p.category === 'CEX') return { label: 'Not ranked — exchange product', tag: 'NOT RANKED — EXCHANGE' };
+  if (p.category === 'Chain') return { label: 'Not ranked — a chain, not a protocol', tag: 'NOT RANKED — CHAIN' };
+  if (EXCHANGE_PREFIX_RE.test(p.name)) return { label: 'Not ranked — exchange product', tag: 'NOT RANKED — EXCHANGE' };
+  if (WRAPPED_OR_STAKED_WORD.test(p.name)) return { label: 'Not ranked — wrapped or staked product', tag: 'NOT RANKED — WRAPPED / STAKED' };
+  if (VERSION_SUFFIX.test(p.name)) return { label: 'Not ranked — versioned pool of another protocol', tag: 'NOT RANKED — VERSIONED POOL' };
+  return { label: 'Not ranked — product of another protocol', tag: 'NOT RANKED — PRODUCT' };
+}
+
+/**
+ * The full catalogue for the All view: every protocol in the snapshot,
+ * ordered ranked first (in rank order), then the already-traded (largest
+ * market cap first), then the screened-out (largest TVL first). Display
+ * data only: board.json keeps exactly the ranked rows the gate scores.
+ */
+export function buildCatalogue(snapshot: Snapshot, extras: ExtraData, board: BoardRow[]): CatalogueRow[] {
+  const rankedBy = new Map(board.map((r) => [r.slug, r]));
+  const entries: CatalogueRow[] = snapshot.protocols.map((p) => {
+    const socials = extras.socials.get(p.slug) ?? NO_SOCIALS;
+    const base = {
+      slug: p.slug,
+      name: p.name,
+      category: p.category,
+      chains: p.chains,
+      tvl_usd: p.tvl_usd,
+      change_7d: p.change_7d,
+      mcap_usd: p.mcap_usd,
+      symbol: p.symbol,
+      sector: sectorFor(p.category).sector,
+      sector_label: sectorFor(p.category).label,
+      twitter: socials.twitter,
+      website: socials.website,
+      raised_usd: extras.raises.get(p.slug)?.total_usd ?? null,
+      raised_rounds: extras.raises.get(p.slug)?.rounds ?? null,
+      age_days: ageInDays(snapshot.as_of, p.listed_at),
+    };
+    const ranked = rankedBy.get(p.slug);
+    if (ranked !== undefined) {
+      return { ...base, status: 'ranked' as const, status_label: 'Ranked', status_tag: 'RANKED', rank: ranked.rank, implied_value_usd: ranked.implied_value_usd, seq: 0 };
+    }
+    if (!recordsNoToken(p)) {
+      return { ...base, status: 'traded' as const, status_label: 'Already traded', status_tag: 'ALREADY TRADED', rank: null, implied_value_usd: null, seq: 0 };
+    }
+    const reason = notRankedReason(p);
+    return { ...base, status: 'screened' as const, status_label: reason.label, status_tag: reason.tag, rank: null, implied_value_usd: null, seq: 0 };
+  });
+  const group = { ranked: 0, traded: 1, screened: 2 } as const;
+  entries.sort(
+    (a, b) =>
+      group[a.status] - group[b.status] ||
+      (a.status === 'ranked' ? a.rank! - b.rank! : 0) ||
+      (a.status === 'traded' ? (b.mcap_usd ?? 0) - (a.mcap_usd ?? 0) : 0) ||
+      b.tvl_usd - a.tvl_usd ||
+      (a.slug < b.slug ? -1 : 1),
+  );
+  entries.forEach((e, i) => {
+    e.seq = i;
+  });
+  return entries;
+}
+
 /** The traded set: protocols whose token already exists, at the market's own numbers. */
 export function buildLive(snapshot: Snapshot, extras: ExtraData): LiveRow[] {
   return snapshot.protocols
@@ -524,6 +649,7 @@ export function buildLive(snapshot: Snapshot, extras: ExtraData): LiveRow[] {
 export function buildRadar(snapshot: Snapshot, extras: ExtraData = EMPTY_EXTRAS): { board: BoardRow[]; radar: RadarData } {
   const board = buildBoard(snapshot, extras);
   const live = buildLive(snapshot, extras);
+  const catalogue = buildCatalogue(snapshot, extras, board);
   const peers = peerMultiples(snapshot);
   const radar: RadarData = {
     as_of: snapshot.as_of,
@@ -538,9 +664,12 @@ export function buildRadar(snapshot: Snapshot, extras: ExtraData = EMPTY_EXTRAS)
       board: board.length,
       early: board.filter((r) => !r.on_watchlist).length,
       live: live.length,
+      traded: catalogue.filter((c) => c.status === 'traded').length,
+      screened: catalogue.filter((c) => c.status === 'screened').length,
     },
     rows: board,
     live,
+    catalogue,
   };
   return { board, radar };
 }

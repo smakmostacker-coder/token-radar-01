@@ -160,6 +160,7 @@ td.rank { color: var(--faint); font-variant-numeric: tabular-nums; }
 }
 .tag.wl { background: var(--tag-bg); color: var(--tag-ink); border: 1px solid var(--tag-line); }
 .tag.sig { background: var(--accent-soft); color: var(--accent); border: 1px solid #bfe0d4; }
+.tag.off { background: #eef1f0; color: var(--muted); border: 1px solid var(--line); }
 .up { color: var(--accent); }
 .down { color: var(--down); }
 .flat { color: var(--faint); }

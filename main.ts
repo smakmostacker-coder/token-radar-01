@@ -50,7 +50,7 @@ function loadExtras(): ExtraData {
     const note = str(o.note);
     const source = str(o.source);
     const ref = str(o.ref);
-    if (note !== null && source !== null && ref !== null) signals.set(slug, { note, source, ref });
+    if (note !== null && source !== null && ref !== null) signals.set(slug, { note, source, ref, confirmed: o.confirmed === true });
   }
   const raises = new Map<string, Raised>();
   for (const [slug, rec] of Object.entries(readDataset('raises.json').by_slug ?? {})) {
@@ -136,6 +136,7 @@ writeFileSync(join(outDir, 'dossier.json'), dossier);
 
 process.stdout.write(
   `launch radar: scanned ${radar.counts.scanned} protocols, watchlist ${radar.counts.watchlist} covered, ` +
-    `${radar.counts.board} rows ranked (${radar.counts.early} beyond the watchlist), ${radar.counts.live} traded shown apart\n` +
+    `${radar.counts.board} rows ranked (${radar.counts.early} beyond the house list), ${radar.counts.traded} already traded, ` +
+    `${radar.counts.screened} screened out; the All view lists all ${radar.counts.scanned}\n` +
     `launch radar: wrote board.json, data.js, dashboard/ (${pageFiles.length} files), screenshots/ (${shotFiles.length} images), dossier.json (${dossier.length} bytes)\n`,
 );
