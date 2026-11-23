@@ -7,24 +7,39 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header class="masthead">
-  <div class="masthead-in">
+<div class="shell">
+  <aside class="side">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true"><span></span></div>
-      <div>
-        <h1>Launch Radar</h1>
-        <p class="tagline">Protocols that record no token yet, ranked by what a launch would be worth.</p>
-      </div>
+      <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="brand-name">Launch<em>Radar</em></div>
     </div>
-    <div class="masthead-stats" id="masthead-stats"></div>
-  </div>
-</header>
-<main id="view" aria-live="polite"></main>
-<footer class="colophon">
-  <p id="model-line"></p>
-  <p id="source-line" class="dim"></p>
-  <p class="dim">An implied value is this board's own claim, worked out from the snapshot's figures alone. It is not a prediction that a token will be issued, or when. “Records no token” is what the data says; it is never proof a protocol has none.</p>
-</footer>
+    <p class="brand-sub">Token launch radar</p>
+    <nav class="nav" id="nav">
+      <button data-seg="all" class="on">All protocols</button>
+      <button data-seg="top">Top protocols</button>
+      <button data-seg="early">Early protocols</button>
+      <button data-seg="watchlist">Watchlist</button>
+      <button data-seg="method" class="util">Method &amp; sources</button>
+    </nav>
+    <div class="side-box">
+      <h3>How to read this</h3>
+      <p><b>All</b> is the full ranked board. <b>Top</b> is the biggest by TVL. <b>Early</b> is tracked for under six months. <b>Watchlist</b> is the house list plus protocols whose team has publicly signalled a token — every signal is sourced on its row.</p>
+    </div>
+    <div class="side-box">
+      <h3>The screen</h3>
+      <p>Ranked protocols record no token and are independent: no bridges, no wrapped or staked products of a token that trades, no exchanges, no chains. The house watchlist always ranks.</p>
+    </div>
+    <div class="side-foot" id="side-foot"></div>
+  </aside>
+  <main class="main">
+    <section class="stats" id="stats"></section>
+    <section id="view" aria-live="polite"></section>
+    <footer class="foot">
+      <p id="source-line"></p>
+      <p>An implied value is this board's own claim, worked out from the figures named in Method &amp; sources. It is not a prediction that a token will be issued, or when. “Records no token” is what the data says; it is never proof a protocol has none. Links are shown as text, exactly as the sources record them.</p>
+    </footer>
+  </main>
+</div>
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>

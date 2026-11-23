@@ -16,6 +16,25 @@
 //
 // Nothing is keyed to a protocol's name: the same code scores every row, and
 // every row carries its own arithmetic so a reader can check it.
+//
+// Who may be ranked at all is a screen, stated once here and applied to every
+// row alike (isRankable): a protocol must record no token, and must be an
+// independent protocol rather than a product of something else — not a bridge
+// or a wrapped, staked or restaked product of a token that already trades,
+// not an exchange or its namesake products, not a chain itself, and not a
+// versioned pool of another protocol. The house's watchlist is exempt from
+// the product screen: the gate requires every watchlist slug on the board,
+// and the watchlist is the floor the house set, so its members always rank.
+//
+// Data provenance: every figure above is read from the sealed snapshot, which
+// the house fetched from DefiLlama's public API (the snapshot's own `source`
+// field names the endpoint and the fetch time). Socials (twitter, website)
+// come from DefiLlama's live protocol records, baked into lib/socials.json at
+// build time because the program runs with no network; a protocol DefiLlama
+// carries no handle or site for shows none — none is guessed. A sweep of
+// protocols DefiLlama does not track (November 2026) added none: every
+// credible candidate checked was already tracked there or already had a
+// token, so this board invents no off-DefiLlama rows.
 
 /** One protocol record: the ten fields the sealed snapshot carries. */
 export interface Protocol {
@@ -56,7 +75,7 @@ export const WEIGHTS = {
   min_category_peers: 3,
 } as const;
 
-export const MODEL_VERSION = 'peer-multiple-2';
+export const MODEL_VERSION = 'peer-multiple-3';
 
 /** One ranked board row: the gate's fields plus the model's own arithmetic. */
 export interface BoardRow {
@@ -73,6 +92,13 @@ export interface BoardRow {
   symbol: string | null;
   token_status: 'pre-token';
   on_watchlist: boolean;
+  sector: string;
+  sector_label: string;
+  twitter: string | null;
+  website: string | null;
+  raised_usd: number | null;
+  raised_rounds: number | null;
+  signal: Signal | null;
   age_days: number | null;
   implied_value_usd: number;
   model: {
@@ -96,6 +122,115 @@ export interface LiveRow {
   mcap_usd: number | null;
   change_7d: number | null;
   tvl_multiple: number | null;
+  sector: string;
+  sector_label: string;
+  twitter: string | null;
+  website: string | null;
+  raised_usd: number | null;
+  raised_rounds: number | null;
+}
+
+/** A protocol's socials as DefiLlama records them; either field may be absent. */
+export interface Socials {
+  twitter: string | null;
+  website: string | null;
+}
+
+/** Socials by slug, from lib/socials.json (DefiLlama's live records, build-time fetch). */
+export type SocialsMap = ReadonlyMap<string, Socials>;
+
+/** A sourced airdrop signal: what the hint is, who reported it, and where it was seen. */
+export interface Signal {
+  note: string;
+  source: string;
+  ref: string;
+}
+
+/** Signals by slug, from lib/signals.json (checked by hand against the named sources). */
+export type SignalsMap = ReadonlyMap<string, Signal>;
+
+/** A protocol's fundraising as DefiLlama's raises records give it; absent means none on record. */
+export interface Raised {
+  total_usd: number;
+  rounds: number;
+  last_round: string | null;
+  last_amount_usd: number | null;
+  last_date: string | null;
+}
+
+/** Raises by slug, from lib/raises.json (DefiLlama's per-protocol raises records, build-time fetch). */
+export type RaisesMap = ReadonlyMap<string, Raised>;
+
+/** The build-time datasets the program joins onto the snapshot, each with its own provenance. */
+export interface ExtraData {
+  socials: SocialsMap;
+  signals: SignalsMap;
+  raises: RaisesMap;
+}
+
+/**
+ * Sector labels: what a protocol IS, mapped from DefiLlama's category field
+ * by this stated table — the category is the source, the label is the map.
+ * `sector` is the filter group; `label` is the fuller name a reader sees.
+ */
+export interface Sector {
+  sector: string;
+  label: string;
+}
+
+const SECTOR_BY_CATEGORY: Record<string, Sector> = {
+  Lending: { sector: 'DeFi', label: 'DeFi · Lending' },
+  'Uncollateralized Lending': { sector: 'DeFi', label: 'DeFi · Lending' },
+  Dexs: { sector: 'DeFi', label: 'DeFi · DEX' },
+  Derivatives: { sector: 'DeFi', label: 'DeFi · Perps' },
+  Options: { sector: 'DeFi', label: 'DeFi · Options' },
+  'Options Vault': { sector: 'DeFi', label: 'DeFi · Options' },
+  'Interest Rate Derivatives': { sector: 'DeFi', label: 'DeFi · Options' },
+  Yield: { sector: 'DeFi', label: 'DeFi · Yield' },
+  'Yield Aggregator': { sector: 'DeFi', label: 'DeFi · Yield' },
+  'Liquidity Manager': { sector: 'DeFi', label: 'DeFi · Yield' },
+  Farm: { sector: 'DeFi', label: 'DeFi · Yield' },
+  'Leveraged Farming': { sector: 'DeFi', label: 'DeFi · Yield' },
+  'Risk Curators': { sector: 'DeFi', label: 'DeFi · Vault Curators' },
+  'Onchain Capital Allocator': { sector: 'DeFi', label: 'DeFi · Vault Curators' },
+  CDP: { sector: 'DeFi', label: 'DeFi · Stablecoins & CDP' },
+  'CDP Manager': { sector: 'DeFi', label: 'DeFi · Stablecoins & CDP' },
+  'Algo-Stables': { sector: 'DeFi', label: 'DeFi · Stablecoins & CDP' },
+  'Dual-Token Stablecoin': { sector: 'DeFi', label: 'DeFi · Stablecoins & CDP' },
+  'Stablecoin Issuer': { sector: 'DeFi', label: 'DeFi · Stablecoins & CDP' },
+  'Basis Trading': { sector: 'DeFi', label: 'DeFi · Basis & Synthetics' },
+  Synthetics: { sector: 'DeFi', label: 'DeFi · Basis & Synthetics' },
+  'Staking Pool': { sector: 'DeFi', label: 'DeFi · Staking' },
+  Restaking: { sector: 'DeFi', label: 'DeFi · Staking' },
+  Indexes: { sector: 'DeFi', label: 'DeFi · Indexes' },
+  Insurance: { sector: 'DeFi', label: 'DeFi · Insurance' },
+  CeDeFi: { sector: 'DeFi', label: 'DeFi · CeDeFi' },
+  'Reserve Currency': { sector: 'DeFi', label: 'DeFi · Reserve Currency' },
+  'Collateral Markets': { sector: 'DeFi', label: 'DeFi · Collateral' },
+  'Collateral Management': { sector: 'DeFi', label: 'DeFi · Collateral' },
+  'OTC Marketplace': { sector: 'DeFi', label: 'DeFi · OTC' },
+  RWA: { sector: 'RWA', label: 'RWA · Tokenised Assets' },
+  'Prediction Market': { sector: 'Prediction', label: 'Prediction Markets' },
+  Payments: { sector: 'Payments', label: 'Payments & Cards' },
+  'Crypto Card Issuer': { sector: 'Payments', label: 'Payments & Cards' },
+  Launchpad: { sector: 'Launchpad', label: 'Launchpad' },
+  'Token Locker': { sector: 'Tools', label: 'Tools' },
+  'NFT Marketplace': { sector: 'NFT', label: 'NFT Marketplaces' },
+  'AI Agents': { sector: 'AI', label: 'AI' },
+  'Decentralized AI': { sector: 'AI', label: 'AI' },
+  DOR: { sector: 'Infra', label: 'Infra · Oracles' },
+  Privacy: { sector: 'Infra', label: 'Infra · Privacy' },
+  'Governance Incentives': { sector: 'Infra', label: 'Infra · Incentives' },
+};
+
+/** The sector of a protocol, from its DefiLlama category alone. */
+export function sectorFor(category: string | null): Sector {
+  if (category !== null) {
+    const hit = SECTOR_BY_CATEGORY[category];
+    if (hit !== undefined) return hit;
+    return { sector: 'Other', label: `Other · ${category}` };
+  }
+  return { sector: 'Other', label: 'Other · Uncategorized' };
 }
 
 /** The dashboard's dataset: the ranked rows, the traded set, the model's weights. */
@@ -138,9 +273,58 @@ export function recordsNoToken(p: Protocol): boolean {
 
 const VERSION_SUFFIX = /\s(V\d+(\.\d+)?|v\d+(\.\d+)?|\d+\.\d+)$/;
 
-/** Rankable: pre-token, not an exchange itself, not a versioned pool of another protocol. */
-export function isRankable(p: Protocol): boolean {
-  return recordsNoToken(p) && p.category !== 'CEX' && !VERSION_SUFFIX.test(p.name);
+/**
+ * Product categories that are not independent protocols waiting on a launch
+ * of their own: bridges and the wrapped, staked or restaked products of a
+ * token that already trades, exchanges, and the chains themselves. The list
+ * extends the house's watchlist screen (Bridge, Canonical Bridge, Liquid
+ * Staking, Liquid Restaking, Restaked BTC, CEX) with the same product
+ * families under the names this snapshot gives them (Cross Chain Bridge,
+ * Anchor BTC, Decentralized BTC, Stablecoin Wrapper, Chain).
+ */
+export const PRODUCT_CATEGORIES: ReadonlySet<string> = new Set([
+  'Bridge',
+  'Canonical Bridge',
+  'Cross Chain Bridge',
+  'Liquid Staking',
+  'Liquid Restaking',
+  'Restaked BTC',
+  'Anchor BTC',
+  'Decentralized BTC',
+  'Stablecoin Wrapper',
+  'CEX',
+  'Chain',
+]);
+
+/** Exchanges whose namesake products are the exchange's, not a launch candidate's. */
+export const EXCHANGE_PREFIXES: readonly string[] = [
+  'Binance',
+  'Coinbase',
+  'Bybit',
+  'Kraken',
+  'Bitget',
+  'OKX',
+  'Bitfinex',
+  'Gemini',
+];
+
+const WRAPPED_OR_STAKED_WORD = /\b(wrapped|staked|staking)\b/i;
+const EXCHANGE_PREFIX_RE = new RegExp(`^(${EXCHANGE_PREFIXES.join('|')})\\b`);
+
+/**
+ * Rankable: records no token, and is an independent protocol — not a bridge,
+ * wrapped, staked or restaked product of one that trades, not an exchange or
+ * a product carrying an exchange's name, not a chain, and not a versioned
+ * pool of another protocol. Watchlist members always rank: the gate requires
+ * their coverage and the watchlist is the house's own floor.
+ */
+export function isRankable(p: Protocol, onWatchlist: ReadonlySet<string>): boolean {
+  if (!recordsNoToken(p) || VERSION_SUFFIX.test(p.name)) return false;
+  if (onWatchlist.has(p.slug)) return true;
+  if (p.category !== null && PRODUCT_CATEGORIES.has(p.category)) return false;
+  if (EXCHANGE_PREFIX_RE.test(p.name)) return false;
+  if (WRAPPED_OR_STAKED_WORD.test(p.name)) return false;
+  return true;
 }
 
 function median(values: number[]): number {
@@ -273,11 +457,15 @@ export function farmPlan(p: Protocol, age: number | null): string[] {
   return steps.map((s) => (s.length > 600 ? `${s.slice(0, 596)}...` : s));
 }
 
+const NO_SOCIALS: Socials = { twitter: null, website: null };
+
+export const EMPTY_EXTRAS: ExtraData = { socials: new Map(), signals: new Map(), raises: new Map() };
+
 /** The ranked board: every watchlist slug, plus every other rankable protocol the snapshot carries. */
-export function buildBoard(snapshot: Snapshot): BoardRow[] {
+export function buildBoard(snapshot: Snapshot, extras: ExtraData): BoardRow[] {
   const peers = peerMultiples(snapshot);
   const onWatchlist = new Set(snapshot.watchlist);
-  const chosen = snapshot.protocols.filter(isRankable);
+  const chosen = snapshot.protocols.filter((p) => isRankable(p, onWatchlist));
   const scored = chosen.map((p) => ({ p, ...scoreProtocol(p, snapshot.as_of, peers) }));
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : 1));
   return scored.map((s, i) => ({
@@ -294,6 +482,13 @@ export function buildBoard(snapshot: Snapshot): BoardRow[] {
     symbol: s.p.symbol,
     token_status: 'pre-token' as const,
     on_watchlist: onWatchlist.has(s.p.slug),
+    sector: sectorFor(s.p.category).sector,
+    sector_label: sectorFor(s.p.category).label,
+    twitter: (extras.socials.get(s.p.slug) ?? NO_SOCIALS).twitter,
+    website: (extras.socials.get(s.p.slug) ?? NO_SOCIALS).website,
+    raised_usd: extras.raises.get(s.p.slug)?.total_usd ?? null,
+    raised_rounds: extras.raises.get(s.p.slug)?.rounds ?? null,
+    signal: extras.signals.get(s.p.slug) ?? null,
     age_days: s.age,
     implied_value_usd: s.implied,
     model: s.model,
@@ -302,7 +497,7 @@ export function buildBoard(snapshot: Snapshot): BoardRow[] {
 }
 
 /** The traded set: protocols whose token already exists, at the market's own numbers. */
-export function buildLive(snapshot: Snapshot): LiveRow[] {
+export function buildLive(snapshot: Snapshot, extras: ExtraData): LiveRow[] {
   return snapshot.protocols
     .filter((p) => !recordsNoToken(p) && p.category !== 'CEX')
     .sort((a, b) => (b.mcap_usd ?? 0) - (a.mcap_usd ?? 0) || b.tvl_usd - a.tvl_usd || (a.slug < b.slug ? -1 : 1))
@@ -316,13 +511,19 @@ export function buildLive(snapshot: Snapshot): LiveRow[] {
       mcap_usd: p.mcap_usd,
       change_7d: p.change_7d,
       tvl_multiple: p.mcap_usd !== null && p.tvl_usd > 0 ? round4(p.mcap_usd / p.tvl_usd) : null,
+      sector: sectorFor(p.category).sector,
+      sector_label: sectorFor(p.category).label,
+      twitter: (extras.socials.get(p.slug) ?? NO_SOCIALS).twitter,
+      website: (extras.socials.get(p.slug) ?? NO_SOCIALS).website,
+      raised_usd: extras.raises.get(p.slug)?.total_usd ?? null,
+      raised_rounds: extras.raises.get(p.slug)?.rounds ?? null,
     }));
 }
 
 /** Everything the dashboard renders, plus the counts its header states. */
-export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: RadarData } {
-  const board = buildBoard(snapshot);
-  const live = buildLive(snapshot);
+export function buildRadar(snapshot: Snapshot, extras: ExtraData = EMPTY_EXTRAS): { board: BoardRow[]; radar: RadarData } {
+  const board = buildBoard(snapshot, extras);
+  const live = buildLive(snapshot, extras);
   const peers = peerMultiples(snapshot);
   const radar: RadarData = {
     as_of: snapshot.as_of,

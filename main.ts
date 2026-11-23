@@ -13,7 +13,61 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildRadar, loadSnapshot, toDataScript, validateBoard } from './lib/model.ts';
+import type { ExtraData, Raised, Signal, Socials } from './lib/model.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
+
+/** Read one of the build-time datasets in lib/; a missing or unreadable file reads as empty. */
+function readDataset(name: string): { by_slug?: Record<string, unknown> } {
+  const path = join(repoDir, 'lib', name);
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as { by_slug?: Record<string, unknown> };
+  } catch {
+    return {};
+  }
+}
+
+const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null);
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * The build-time datasets, each baked into the repository because this
+ * program runs with no network, and each with its provenance in its file's
+ * meta block: socials and raises from DefiLlama's records (lib/socials.json,
+ * lib/raises.json), airdrop signals checked by hand (lib/signals.json). A
+ * slug with no record shows nothing for that field; nothing is guessed.
+ */
+function loadExtras(): ExtraData {
+  const socials = new Map<string, Socials>();
+  for (const [slug, pair] of Object.entries(readDataset('socials.json').by_slug ?? {})) {
+    if (!Array.isArray(pair)) continue;
+    socials.set(slug, { twitter: str(pair[0]), website: str(pair[1]) });
+  }
+  const signals = new Map<string, Signal>();
+  for (const [slug, rec] of Object.entries(readDataset('signals.json').by_slug ?? {})) {
+    if (typeof rec !== 'object' || rec === null) continue;
+    const o = rec as Record<string, unknown>;
+    const note = str(o.note);
+    const source = str(o.source);
+    const ref = str(o.ref);
+    if (note !== null && source !== null && ref !== null) signals.set(slug, { note, source, ref });
+  }
+  const raises = new Map<string, Raised>();
+  for (const [slug, rec] of Object.entries(readDataset('raises.json').by_slug ?? {})) {
+    if (!Array.isArray(rec)) continue;
+    const total = num(rec[0]);
+    const rounds = num(rec[1]);
+    if (total === null || rounds === null) continue;
+    raises.set(slug, {
+      total_usd: total,
+      rounds,
+      last_round: str(rec[2]),
+      last_amount_usd: num(rec[3]),
+      last_date: str(rec[4]),
+    });
+  }
+  return { socials, signals, raises };
+}
 
 const repoDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -37,7 +91,7 @@ if (!existsSync(snapshotPath)) fail(`no snapshot at ${snapshotPath}: pass --inpu
 const outDir = option('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
 const snapshot = loadSnapshot(readFileSync(snapshotPath, 'utf8'));
-const { board, radar } = buildRadar(snapshot);
+const { board, radar } = buildRadar(snapshot, loadExtras());
 const problem = validateBoard(board, snapshot);
 if (problem !== null) fail(`the model produced a board the gate refuses: ${problem}`);
 
