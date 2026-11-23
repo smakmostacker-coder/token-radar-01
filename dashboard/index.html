@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Radar — pre-token protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-in">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      <div>
+        <h1>Launch Radar</h1>
+        <p class="tagline">Protocols that record no token yet, ranked by what a launch would be worth.</p>
+      </div>
+    </div>
+    <div class="masthead-stats" id="masthead-stats"></div>
+  </div>
+</header>
+<main id="view" aria-live="polite"></main>
+<footer class="colophon">
+  <p id="model-line"></p>
+  <p id="source-line" class="dim"></p>
+  <p class="dim">An implied value is this board's own claim, worked out from the snapshot's figures alone. It is not a prediction that a token will be issued, or when. “Records no token” is what the data says; it is never proof a protocol has none.</p>
+</footer>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
